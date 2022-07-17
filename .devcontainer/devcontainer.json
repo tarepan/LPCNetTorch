@@ -1,0 +1,44 @@
+{
+    "name": "ML PyTorch",
+
+    // Container origin
+    //// from pre-build image
+    // "image": "xxx/yyy",
+    //// from Dockerfile
+    "build": {
+      "dockerfile": "Dockerfile",
+      "context": ".."
+    },
+
+    // VS Code specific properties
+    "settings": {
+      // Interpreter - Python 3.X in devcontainer
+      "defaultInterpreterPath": "/usr/local/bin/python",
+      //
+      "python.linting.enabled": true,
+      "python.linting.pylintEnabled": true,
+      "python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
+      "python.formatting.blackPath": "/usr/local/py-utils/bin/black",
+      "python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+      "python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
+      "python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
+      "python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
+      "python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
+      "python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
+      "python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
+      // Static type checker - Pyright in Pylance
+      "python.analysis.typeCheckingMode": "strict"
+    },
+    // Add the IDs of extensions you want installed when the container is created.
+    "extensions": [
+      // It install Pylance (`ms-python.vscode-pylance`) automatically
+      "ms-python.python",
+      "yzhang.markdown-all-in-one",
+    ],
+
+    // Post processings
+    // poetry in Dockerfile automatically update env file, but it is not yet reloaded on shell. So, we choose direct poetry binary call.
+    "postCreateCommand": "$HOME/.local/bin/poetry install",
+
+    "remoteUser": "root"
+  }
