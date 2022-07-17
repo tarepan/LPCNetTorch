@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "pack_name"
+name = "lpcnet"
 version = "0.0.0"
 description = "Description of this project"
-authors = ["user_name"]
+authors = ["tarepan"]
 readme = "README.md"
-repository = "https://github.com/user_name/repo_name"
+repository = "https://github.com/tarepan/LPCNetTorch"
 
 [tool.poetry.dependencies]
 python = "^3.7"
