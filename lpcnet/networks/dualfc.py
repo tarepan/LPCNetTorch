@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass
 
-from torch import nn, Tensor, ones            # pylint: disable=no-name-in-module
-from torch.nn.functional import tanh, sigmoid # pyright: ignore [reportUnknownVariableType]
+from torch import nn, Tensor, ones, tanh, sigmoid # pylint: disable=no-name-in-module
 from omegaconf import MISSING
 
 

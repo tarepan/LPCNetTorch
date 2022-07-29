@@ -1,7 +1,6 @@
 """Test DualFC"""
 
-from torch import nn, tensor, equal           # pylint: disable=no-name-in-module
-from torch.nn.functional import tanh, sigmoid # pyright: ignore [reportUnknownVariableType]
+from torch import nn, tensor, equal, tanh, sigmoid # pylint: disable=no-name-in-module
 
 from .dualfc import DualFC, ConfDualFC
 
