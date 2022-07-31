@@ -4,7 +4,19 @@ from torch import Tensor, cat, sum # pylint: disable=no-name-in-module,redefined
 from torch.nn.functional import pad
 
 
-def linear_prediction(s_t_1_series: Tensor, coeff_series: Tensor, order: int) -> Tensor:
+def linear_prediction(s_t_n: Tensor, coeffs: Tensor) -> Tensor:
+    """
+    Args:
+        s_t_n  :: (B, Order) - sample t-1 ~ t-ORDER
+        coeffs :: (Order)    - LP coefficients
+    Returns:
+        p_t    :: (B,)       - LinearPrediction
+    """
+
+    return sum(s_t_n * coeffs, dim=1)
+
+
+def linear_prediction_series(s_t_1_series: Tensor, coeff_series: Tensor, order: int) -> Tensor:
     """
     Args:
         s_t_1_series :: (B,     T=t_s) - Lagged/Delayed sample series (waveform)
