@@ -28,10 +28,22 @@ transform:
         len_clip: 10
 model:
     net:
-        dim_i: 1
-        dim_o: 1
-        child:
-            dropout: 0.5
+        sample_per_frame: 160
+        lp_order: 16
+        ndim_cond_feat: 128
+        frame_net:
+            ndim_i_feat: 20
+            codebook_size: 256
+            ndim_emb: 64
+            kernel_size: 3
+            num_conv_layer: 2
+            num_segfc_layer: 2
+            padding: 4
+        sample_net:
+            sample_level: 256
+            ndim_emb: 128
+            size_gru_a: 384
+            size_gru_b: 16
     optim:
         learning_rate: 0.001
     transform: "${transform}"

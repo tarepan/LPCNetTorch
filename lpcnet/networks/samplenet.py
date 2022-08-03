@@ -47,13 +47,17 @@ class ConfSampleNet:
         size_gru_a - The unit size of GRU_A's hidden/output
         size_gru_b - The unit size of GRU_A's hidden/output
     """
+    sample_level: int = MISSING
     ndim_emb: int = MISSING
     emb: ConfDifferentialEmbedding = ConfDifferentialEmbedding(
+        codebook_size=SI("${..sample_level}"),
         ndim_emb=SI("${..ndim_emb}"),)
     ndim_cond_feat: int = MISSING
     size_gru_a: int = MISSING # 384
     size_gru_b: int = MISSING # 16
-    dual_fc : ConfDualFC = ConfDualFC()
+    dual_fc : ConfDualFC = ConfDualFC(
+        ndim_i_feat=SI("${..size_gru_b}"),
+        ndim_o_feat=SI("${..sample_level}"),)
 
 class SampleNet(nn.Module):
     """The FrameRateNetwork.

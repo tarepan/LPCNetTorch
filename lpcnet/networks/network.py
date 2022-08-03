@@ -24,9 +24,11 @@ class ConfNetwork:
     """
     sample_per_frame: int = MISSING
     lp_order: int = MISSING
+    ndim_cond_feat: int = MISSING
     frame_net: ConfFrameNet = ConfFrameNet(
-        ndim_h_o_feat=SI("${..}"),)
-    sample_net: ConfSampleNet = ConfSampleNet()
+        ndim_h_o_feat=SI("${..ndim_cond_feat}"),)
+    sample_net: ConfSampleNet = ConfSampleNet(
+        ndim_cond_feat=SI("${..ndim_cond_feat}"),)
 
 class Network(nn.Module):
     """The LPCNet Network.
