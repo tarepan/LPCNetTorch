@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from typing import List
 from pathlib import Path
 
-import numpy as np
 from omegaconf import MISSING
 from torch import from_numpy, stack # pyright: ignore [reportUnknownVariableType] ; because of PyTorch ; pylint: disable=no-name-in-module
 
-from ..domain import FugaBatched, HogeBatched, HogeFugaBatch, LenFuga
-from .domain import FugaDatum, HogeDatum, HogeFuga, HogeFugaDatum, Piyo, Hoge, Fuga
+from ..domain import FPitchCoeffSt1nStcBatch
+from .domain import FeatSeries, St1SeriesNoisy, FPitchCoeffSt1nStc, \
+    FeatSeriesDatum, PitchSeriesDatum, LPCoeffSeriesDatum, St1SeriesNoisyDatum, StSeriesCleanDatum, FPitchCoeffSt1nStcDatum
 
 
 # [Data transformation]
@@ -38,12 +38,12 @@ class ConfLoad:
     """
     sampling_rate: int = MISSING
 
-def load_raw(conf: ConfLoad, path: Path) -> Piyo:
+def load_raw(conf: ConfLoad, path: Path) -> St1SeriesNoisyDatum:
     """Load raw data 'piyo' from the adress."""
 
     # Audio Example (librosa is not handled by this template)
     import librosa # pyright: ignore [reportMissingImports, reportUnknownVariableType] ; pylint: disable=import-outside-toplevel,import-error
-    piyo: Piyo = librosa.load(path, sr=conf.sampling_rate, mono=True)[0] # pyright: ignore [reportUnknownMemberType]
+    piyo: St1SeriesNoisyDatum = librosa.load(path, sr=conf.sampling_rate, mono=True)[0] # pyright: ignore [reportUnknownMemberType]
 
     return piyo
 
@@ -59,11 +59,11 @@ class ConfPiyo2Hoge:
     """
     amp: float = MISSING
 
-def piyo_to_hoge(conf: ConfPiyo2Hoge, piyo: Piyo) -> Hoge:
+def piyo_to_hoge(conf: ConfPiyo2Hoge, piyo: St1SeriesNoisyDatum) -> St1SeriesNoisy:
     """Convert piyo to hoge.
     """
     # Amplification :: (T,) -> (T,)
-    hoge: Hoge = piyo * conf.amp
+    hoge: St1SeriesNoisy = piyo * conf.amp
 
     return hoge
 
@@ -77,11 +77,11 @@ class ConfPiyo2Fuga:
     """
     div: float = MISSING
 
-def piyo_to_fuga(conf: ConfPiyo2Fuga, piyo: Piyo) -> Fuga:
+def piyo_to_fuga(conf: ConfPiyo2Fuga, piyo: St1SeriesNoisyDatum) -> FeatSeries:
     """Convert piyo to fuga.
     """
     # Division :: (T,) -> (T,)
-    fuga: Fuga = piyo / conf.div
+    fuga: FeatSeries = piyo / conf.div
 
     return fuga
 
@@ -95,7 +95,7 @@ class ConfPreprocess:
     piyo2hoge: ConfPiyo2Hoge = ConfPiyo2Hoge()
     piyo2fuga: ConfPiyo2Fuga = ConfPiyo2Fuga()
 
-def preprocess(conf: ConfPreprocess, raw: Piyo) -> HogeFuga:
+def preprocess(conf: ConfPreprocess, raw: St1SeriesNoisyDatum) -> FPitchCoeffSt1nStc:
     """Preprocessing (raw_to_item) - Process raw data into item.
 
     Piyo -> Hoge & Fuga
@@ -110,42 +110,44 @@ class ConfAugment:
     """
     Configuration of item-to-datum augmentation.
     Args:
-        len_clip - Length of clipping
+        placeholder - Pass through
     """
-    len_clip: int = MISSING
+    padding: int = MISSING
+    lookahead: int = MISSING
 
-def augment(conf: ConfAugment, hoge_fuga: HogeFuga) -> HogeFugaDatum:
+def augment(conf: ConfAugment, f_pitch_coeff_st1n_stc: FPitchCoeffSt1nStc) -> FPitchCoeffSt1nStcDatum:
     """Augmentation (item_to_datum) - Dynamically modify item into datum.
 
-    Clipping + DimensionExpansion
+    Pass-through
     """
-    hoge, fuga = hoge_fuga
+    feat_series, pitch_series, lpcoeff_series, s_t_1_series_noisy, s_t_series_clean = f_pitch_coeff_st1n_stc
 
-    # Clipping
-    ## :: (T=t,) -> (T=L,)
-    hoge = hoge[:conf.len_clip]
-    ## :: (T=t,) -> (T=L,)
-    fuga = fuga[:conf.len_clip]
+    # Pass-through
+    feat_series_datum:        FeatSeriesDatum     = feat_series
+    pitch_series_datum:       PitchSeriesDatum    = pitch_series
+    s_t_1_series_noisy_datum: St1SeriesNoisyDatum = s_t_1_series_noisy
+    s_t_series_clean_datum:   StSeriesCleanDatum  = s_t_series_clean
 
-    # Dimension expansion
-    ## :: (T,) -> (T, 1)
-    hoge_datum: HogeDatum = np.expand_dims(hoge, axis=-1) # pyright: ignore [reportUnknownMemberType] ; because of numpy
-    ## :: (T,) -> (T, 1)
-    fuga_datum: FugaDatum = np.expand_dims(fuga, axis=-1) # pyright: ignore [reportUnknownMemberType]; because of numpy
+    # Unneeded padding removal :: (T=frm_cnk+pad, Order) -> (T=frm_cnk, Order)
+    pad_left, pad_right = (conf.padding - conf.lookahead), conf.lookahead
+    lpcoeff_series_datum: LPCoeffSeriesDatum = lpcoeff_series[:, pad_left:-pad_right]
 
-    return hoge_datum, fuga_datum
+    return feat_series_datum, pitch_series_datum, lpcoeff_series_datum, s_t_1_series_noisy_datum, s_t_series_clean_datum
 
 ###################################################################################################################################
 # [collation]
 
-def collate(datums: List[HogeFugaDatum]) -> HogeFugaBatch:
+def collate(datums: List[FPitchCoeffSt1nStcDatum]) -> FPitchCoeffSt1nStcBatch:
     """Collation (datum_to_batch) - Bundle multiple datum into a batch."""
 
-    hoge_batched: HogeBatched = stack([from_numpy(datum[0]) for datum in datums])
-    fuga_batched: FugaBatched = stack([from_numpy(datum[1]) for datum in datums])
-    len_fuga: LenFuga = [datum[1].shape[0] for datum in datums]
+    # Pass-through
+    feat_series        = stack([from_numpy(datum[0]) for datum in datums])
+    pitch_series       = stack([from_numpy(datum[1]) for datum in datums])
+    lpcoeff_series     = stack([from_numpy(datum[2]) for datum in datums])
+    s_t_1_noisy_series = stack([from_numpy(datum[3]) for datum in datums])
+    s_t_clean_series   = stack([from_numpy(datum[4]) for datum in datums])
 
-    return hoge_batched, fuga_batched, len_fuga
+    return feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series
 
 ###################################################################################################################################
 

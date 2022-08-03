@@ -1,29 +1,23 @@
 """Domain"""
 
 
-from typing import List, Tuple
+from typing import Tuple
 
 from torch import Tensor # pyright: ignore [reportUnknownVariableType] ; because of PyTorch ; pylint: disable=no-name-in-module
 
 
-"""
-(delele here when template is used)
+# [Batch]
+#     FeatSeriesBatched     :: (B, T=frm_cnk+pad, F)     - Padded feature series
+#     PitchSeriesBatched    :: (B, T=frm_cnk+pad, F)     - Padded Pitch Period series
+#     LPCoeffSeriesBatched  :: (B, T=frm_cnk,     Order) - LinearPrediction Coefficient series
+#     St1SeriesNoisyBatched :: (B, T=spl_cnk)            - Lagged/Delayed sample series (linear_s16pcm waveform) with noise
+#     StSeriesCleanBatched  :: (B, T=spl_cnk)            - Sample series (linear_s16pcm waveform) w/o noise
 
-[Design Notes - Data type]
-    Data is finally transformed by collate_fn in DataLoader, then consumed by x_step of the Model (Network consumes some of them).
-    Both data-side and model-side depends on the data type.
-    For this reason, the data type is separated as domain.
-"""
-
-
-# Data batch
-
-## :: (Batch=b, T=t, 1) - hoge hoge
-HogeBatched = Tensor
-## :: (Batch=b, T=t, 1) - fuga fuga
-FugaBatched = Tensor
-## :: (L=b,)            - Non-padded length of items in the FugaBatched
-LenFuga = List[int]
+FeatSeriesBatched     = Tensor # FloatTensor
+PitchSeriesBatched    = Tensor # LongTensor
+LPCoeffSeriesBatched  = Tensor # FloatTensor
+St1SeriesNoisyBatched = Tensor # LongTensor
+StSeriesCleanBatched  = Tensor # LongTensor
 
 ## the batch
-HogeFugaBatch = Tuple[HogeBatched, FugaBatched, LenFuga]
+FPitchCoeffSt1nStcBatch = Tuple[FeatSeriesBatched, PitchSeriesBatched, LPCoeffSeriesBatched, St1SeriesNoisyBatched, StSeriesCleanBatched]
