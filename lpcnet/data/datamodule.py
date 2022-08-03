@@ -41,19 +41,13 @@ class Data(LightningDataModule):
         """(PL-API) Setup train/val/test datasets.
         """
 
-        # corpus_train, corpus_val, corpus_test = prepare_corpora(self._conf.corpus)
-
-        # if stage == "fit" or stage is None:
-        #     self.dataset_train = FPitchCoeffSt1nStcDataset(self._conf.dataset, corpus_train)
-        #     self.dataset_val   = FPitchCoeffSt1nStcDataset(self._conf.dataset, corpus_val)
-        # if stage == "test" or stage is None:
-        #     self.dataset_test  = FPitchCoeffSt1nStcDataset(self._conf.dataset, corpus_test)
+        corpus_train, corpus_val, corpus_test = prepare_corpora(self._conf.corpus)
 
         if stage == "fit" or stage is None:
-            self.dataset_train = FPitchCoeffSt1nStcDataset(self._conf.dataset)
-            self.dataset_val   = FPitchCoeffSt1nStcDataset(self._conf.dataset)
+            self.dataset_train = FPitchCoeffSt1nStcDataset(self._conf.dataset, corpus_train)
+            self.dataset_val   = FPitchCoeffSt1nStcDataset(self._conf.dataset, corpus_val)
         if stage == "test" or stage is None:
-            self.dataset_test  = FPitchCoeffSt1nStcDataset(self._conf.dataset)
+            self.dataset_test  = FPitchCoeffSt1nStcDataset(self._conf.dataset, corpus_test)
 
     def train_dataloader(self) -> DataLoader[FPitchCoeffSt1nStcDatum]:
         """(PL-API) Generate training dataloader."""

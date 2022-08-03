@@ -54,8 +54,8 @@ class ConfFPitchCoeffSt1nStcDataset:
 class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
     """The Feat/Pitch/LPCoeff/S_t_1_noisy/S_t_clean dataset from the corpus.
     """
-    # def __init__(self, conf: ConfFPitchCoeffSt1nStcDataset, items: CorpusItems):
-    def __init__(self, conf: ConfFPitchCoeffSt1nStcDataset):
+
+    def __init__(self, conf: ConfFPitchCoeffSt1nStcDataset, items: CorpusItems):
         """
         Args:
             conf: The Configuration
