@@ -69,13 +69,15 @@ class SampleNet(nn.Module):
         # Shared signal embedding (for s/sample, p/LP, e/residual)
         self.emb = DifferentialEmbedding(conf.emb)
 
-        # recurrent_constraint = WeightClip(0.992), recurrent_regularizer=quant
+        # todo: recurrent_constraint = WeightClip(0.992), recurrent_regularizer=quant
+        # todo: Sparsification & Quantization
         self.gru_a = nn.GRU(3*conf.ndim_emb + conf.ndim_cond_feat, conf.size_gru_a, batch_first=True)
         ## State@LastForward for stateful training
         self._prev_h_a: Optional[Tensor] = None
         self.gru_cell_a = get_gru_cell(self.gru_a)
 
-        # kernel_constraint & recurrent_constraint = WeightClip(0.992), kernel_regularizer & recurrent_regularizer = quant
+        # todo: kernel_constraint & recurrent_constraint = WeightClip(0.992), kernel_regularizer & recurrent_regularizer = quant
+        # todo: Sparsification & Quantization
         self.gru_b = nn.GRU(conf.size_gru_a + conf.ndim_cond_feat, conf.size_gru_b, batch_first=True)
         ## State@LastForward for stateful training
         self._prev_h_b: Optional[Tensor] = None

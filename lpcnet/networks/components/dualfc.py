@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from torch import nn, Tensor, ones, tanh, sigmoid # pylint: disable=no-name-in-module
+from torch import nn, Tensor, ones, tanh, sigmoid, split # pylint: disable=no-name-in-module
 from omegaconf import MISSING
 
 
@@ -48,7 +48,7 @@ class DualFC(nn.Module):
         act_1_2: Tensor = self.a_1_2 * tanh(self.w_1_2(ipt))
 
         # Split act_1_2 -> (act1, act2) :: (..., Feat=2*o_feat) -> ((..., Feat=o_feat), (..., Feat=o_feat))
-        fc1, fc2 = act_1_2.split((self._ndim_o_feat, self._ndim_o_feat), dim=-1) # pyright: ignore [reportUnknownVariableType, reportUnknownMemberType]
+        fc1, fc2 = split(act_1_2, [self._ndim_o_feat, self._ndim_o_feat], dim=-1)
 
         # Sum+Act :: ((..., Feat=o_feat), (..., Feat=o_feat)) -> (..., Feat=o_feat)
         opt = sigmoid(fc1 + fc2)

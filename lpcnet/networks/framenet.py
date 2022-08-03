@@ -48,13 +48,13 @@ class FrameNet(nn.Module):
         nn.init.uniform_(self.emb.weight, a=-0.05, b=+0.05)
 
         # ConvSegFC: Conv1d_c/k/s1-tanh-Conv1d_c/k/s1-tanh-SegFC_c-tanh-SegFC_c-tanh
-        # :: (B, T, F) -> (B, T, F)
+        # :: (B, T=frm_cnk+pad, F) -> (B, T=frm_cnk, F)
         layers: List[nn.Module] = []
 
         ## Transpose :: (B, T, F) -> (B, F, T)
         layers += [TransposeLast()]
 
-        ## Conv :: (Batch, F=i+emb, T=tmax) -> (B, F, T=<tmax)
+        ## Conv :: (Batch, F=i_f+emb, T=frm_cnk+pad) -> (B, F, T=frm_cnk)
         for i in range(conf.num_conv_layer):
             dim_i = (conf.ndim_i_feat + conf.ndim_emb) if i == 0 else conf.ndim_h_o_feat
             conv = nn.Conv1d(dim_i, conf.ndim_h_o_feat, conf.kernel_size, stride=1)
@@ -63,7 +63,7 @@ class FrameNet(nn.Module):
             nn.init.zeros_(conv.bias) # type:ignore
             layers += [conv, nn.Tanh()]
 
-        ## Transpose :: (B, F, T=<tmax) -> (B, T, F)
+        ## Transpose :: (B, F, T) -> (B, T, F)
         layers += [TransposeLast()]
 
         ## SegFC :: (B, T, F) -> (B, T, F)
@@ -81,14 +81,14 @@ class FrameNet(nn.Module):
         """(PT API) Forward a batch.
 
         Arguments:
-            feat_series  :: (B, T=t,  F) - Feature series
-            pitch_series :: (B, T=t)     - Pitch series
+            feat_series  :: (B, T=frm_cnk+pad, F) - Feature series
+            pitch_series :: (B, T=frm_cnk+pad)    - Pitch Period series
         Returns:
-                         :: (B, T=<t, F) - Output series
+                         :: (B, T=frm_cnk    , F) - Conditioning vector series
         """
 
         # Pitch embedding :: (B, T) -> (B, T, Emb)
         pitch_emb_series = self.emb(pitch_series)
 
-        # ConvSegFC :: ((B, T, F=feat), (B, T, Emb=emb)) -> (B, T=t, F=feat+emb) -> (Batch, T=<t, F)
+        # ConvSegFC :: ((B, T=frm_cnk+pad, F=feat), (B, T=frm_cnk+pad, Emb=emb)) -> (B, T=frm_cnk+pad, F=feat+emb) -> (Batch, T=frm_cnk, F)
         return self.conv_segfc(cat((feat_series, pitch_emb_series), dim=-1))

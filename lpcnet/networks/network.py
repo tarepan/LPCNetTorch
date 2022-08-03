@@ -60,8 +60,7 @@ class Network(nn.Module):
         cond_t_s_series = repeat_interleave(cond_t_f_series, self._sample_per_frame, dim=1)
 
         # LPC calculation (E2E)
-        # lpc_series = lpc()
-        # Frame repeat :: (B, T_f, Feat) -> 
+        # pass
 
         # Linear Prediction
         # (B, T=frm_cnk, Order) -> (B, T=spl_cnk, Order)
