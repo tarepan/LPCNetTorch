@@ -7,6 +7,7 @@ from torch import Tensor, cat # pylint: disable=no-name-in-module
 import torch.nn as nn
 from omegaconf import MISSING
 
+from .components.receptive_field import calc_rf
 from .components.nn_wrapper import TransposeLast
 
 
@@ -22,13 +23,14 @@ class ConfFrameNet:
         num_conv_layer  - The number of convolutional layers
         num_segfc_layer - The number of segmental FC layers
     """
-    ndim_i_feat: int = MISSING
+    ndim_i_feat: int = MISSING # 20
     codebook_size: int = MISSING # SIZE_PITCH_CODEBOOK == 256
     ndim_emb: int = MISSING # DIM_PITCH_EMB == 64
-    ndim_h_o_feat: int = MISSING
+    ndim_h_o_feat: int = MISSING # 128
     kernel_size: int = MISSING # 3
     num_conv_layer: int = MISSING # 2
     num_segfc_layer: int = MISSING # 2
+    padding: int = MISSING # 4
 
 
 class FrameNet(nn.Module):
@@ -36,6 +38,10 @@ class FrameNet(nn.Module):
     """
     def __init__(self, conf: ConfFrameNet):
         super().__init__()
+
+        # Validation - Compatibility between padding config and Conv 'valid' padding size
+        valid_padding = calc_rf(conf.num_conv_layer, conf.kernel_size) - 1
+        assert conf.padding == valid_padding, f"Invalid padding size, {conf.padding} != {valid_padding}"
 
         # Pitch Period embedding: (B, T) -> (B, T, Emb)
         self.emb = nn.Embedding(conf.codebook_size, conf.ndim_emb)
