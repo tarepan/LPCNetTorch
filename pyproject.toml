@@ -27,6 +27,7 @@ lightlightning = {git = "https://github.com/tarepan/lightlightning.git", rev = "
 
 [tool.poetry.dev-dependencies]
 types-tqdm = "^4.64.1"
+pytest = "^7.1.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

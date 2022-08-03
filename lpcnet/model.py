@@ -6,16 +6,18 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-import torch.nn.functional as F
+from torch import nn
 from torch.optim import Adam
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import LambdaLR
 import pytorch_lightning as pl
 from omegaconf import MISSING
 
-from .domain import HogeFugaBatch
-from .data.domain import Piyo
+
+from .domain import FPitchCoeffSt1nStcBatch
+from .data.domain import St1SeriesNoisyDatum
 from .data.transform import ConfTransform, augment, collate, load_raw, preprocess
 from .networks.network import Network, ConfNetwork
+from .networks.components.mulaw import lin2mlawpcm
 
 
 @dataclass
@@ -47,8 +49,9 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
         self._conf = conf
         self._net = Network(conf.net)
+        self.loss = nn.CrossEntropyLoss()
 
-    def forward(self, batch: HogeFugaBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
+    def forward(self, batch: FPitchCoeffSt1nStcBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
         """(PL API) Run inference toward a batch.
         """
         hoge, _, _ = batch
@@ -57,42 +60,42 @@ class Model(pl.LightningModule):
         return self._net.generate(hoge)
 
     # Typing of PL step API is poor. It is typed as `(self, *args, **kwargs)`.
-    def training_step(self, batch: HogeFugaBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
+    def training_step(self, batch: FPitchCoeffSt1nStcBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
         """(PL API) Train the model with a batch.
         """
 
-        hoge, fuga_gt, _ = batch
+        feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
-        # Forward :: (Batch, T, Feat=dim_i) -> (Batch, T, Feat=dim_o)
-        fuga_pred = self._net(hoge)
+        # Forward :: ... -> ((B, T=spl_cnk, JDist), (B, T=spl_cnk))
+        e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
 
         # Loss
-        loss = F.l1_loss(fuga_pred, fuga_gt)
+        e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
+        loss = self.loss(e_t_pd_series_estim, e_t_series_ideal)
 
         self.log('loss', loss) #type: ignore ; because of PyTorch-Lightning
         return {"loss": loss}
 
-    def validation_step(self, batch: HogeFugaBatch, batch_idx: int): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ,unused-argument
+    def validation_step(self, batch: FPitchCoeffSt1nStcBatch, batch_idx: int): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ,unused-argument
         """(PL API) Validate the model with a batch.
         """
 
-        i_pred, o_gt, _ = batch
+        feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
-        # Forward :: (Batch, T, Feat=dim_i) -> (Batch, T, Feat=dim_o)
-        o_pred_fwd = self._net(i_pred)
-
-        # Inference :: (Batch, T, Feat=dim_i) -> (Batch, T, Feat=dim_o)
-        ## Usecase: Autoregressive model (`o_pred_fwd` for teacher-forcing, `o_pred_inf` for AR generation)
-        # o_pred_inf = self.net.generate(i_pred)
+        # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
+        e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
 
         # Loss
-        loss_fwd = F.l1_loss(o_pred_fwd, o_gt)
+        e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
+        loss_fwd = self.loss(e_t_pd_series_estim, e_t_series_ideal)
+
+        # Inference :: ... -> (Batch, T=t_s)
+        s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
 
         # Logging
-        ## Audio
-        # # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
-        # #                                                      ::Tensor(1, L)
-        # self.logger.experiment.add_audio(f"audio_{batch_idx}", o_pred_fwd, global_step=self.global_step, sample_rate=self.conf.sampling_rate)
+        # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
+        #                                                      ::Tensor(1, L)
+        self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self.conf.sampling_rate)
 
         return {
             "val_loss": loss_fwd,
@@ -106,10 +109,11 @@ class Model(pl.LightningModule):
         """(PL API) Set up a optimizer.
         """
         conf = self._conf.optim
+        decay: float = 2.5e-5
 
-        optim = Adam(self._net.parameters(), lr=conf.learning_rate)
+        optim = Adam(self._net.parameters(), lr=conf.learning_rate, betas=(0.9, 0.99), eps=1e-07)
         sched = {
-            "scheduler": StepLR(optim, conf.sched_decay_step, conf.sched_decay_rate),
+            "scheduler": LambdaLR(optim, lr_lambda=lambda step: 1./(1. + decay * step)),
             "interval": "step",
         }
 
@@ -122,7 +126,7 @@ class Model(pl.LightningModule):
     #     """(PL API) Run prediction with a batch. If not provided, predict_step == forward."""
     #     return pred
 
-    def sample(self) -> Piyo:
+    def sample(self) -> St1SeriesNoisyDatum:
         """Acquire sample input toward preprocess."""
 
         # Audio Example (librosa is not handled by this template)
@@ -131,14 +135,14 @@ class Model(pl.LightningModule):
 
         return load_raw(self._conf.transform.load, path)
 
-    def load(self, path: Path) -> Piyo:
+    def load(self, path: Path) -> St1SeriesNoisyDatum:
         """Load raw inputs.
         Args:
             path - Path to the input.
         """
         return load_raw(self._conf.transform.load, path)
 
-    def preprocess(self, piyo: Piyo, to_device: Optional[str] = None) -> HogeFugaBatch:
+    def preprocess(self, piyo: St1SeriesNoisyDatum, to_device: Optional[str] = None) -> FPitchCoeffSt1nStcBatch:
         """Preprocess raw inputs into model inputs for inference."""
 
         conf = self._conf.transform

@@ -51,8 +51,8 @@ class ConfSampleNet:
     emb: ConfDifferentialEmbedding = ConfDifferentialEmbedding(
         ndim_emb=SI("${..ndim_emb}"),)
     ndim_cond_feat: int = MISSING
-    size_gru_a: int = MISSING
-    size_gru_b: int = MISSING
+    size_gru_a: int = MISSING # 384
+    size_gru_b: int = MISSING # 16
     dual_fc : ConfDualFC = ConfDualFC()
 
 class SampleNet(nn.Module):

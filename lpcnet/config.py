@@ -33,9 +33,7 @@ model:
         child:
             dropout: 0.5
     optim:
-        learning_rate: 0.01
-        sched_decay_rate: 0.01
-        sched_decay_step: 1000
+        learning_rate: 0.001
     transform: "${transform}"
 data:
     adress_data_root: ""
@@ -55,15 +53,16 @@ data:
         attr1: 1
         transform: "${transform}"
     loader:
-        batch_size_train: 1
+        batch_size_train: 128
         batch_size_val: 1
         batch_size_test: 1
         num_workers: null
         pin_memory: null
 train:
     gradient_clipping: null
+    # In original LPCNet paper, 120 epochs is 230k steps (c.f. 20epochs/767Ksteps@lpcnet_efficiency)
     max_epochs: 10000
-    val_interval_epoch: 100
+    val_interval_epoch: 10
     profiler: null
     ckpt_log:
         dir_root: "."
