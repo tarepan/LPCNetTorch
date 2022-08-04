@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from torch import nn
+from torch import nn, log, permute
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 import pytorch_lightning as pl
@@ -49,7 +49,7 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
         self._conf = conf
         self._net = Network(conf.net)
-        self.loss = nn.CrossEntropyLoss()
+        self.loss = nn.NLLLoss()
 
     def forward(self, batch: FPitchCoeffSt1nStcBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
         """(PL API) Run inference toward a batch.
@@ -68,10 +68,13 @@ class Model(pl.LightningModule):
 
         # Forward :: ... -> ((B, T=spl_cnk, JDist), (B, T=spl_cnk))
         e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
+        e_t_logp_series_estim = log(e_t_pd_series_estim)
 
-        # Loss
+        # Ideal residual under noisy AR conditions
         e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
-        loss = self.loss(e_t_pd_series_estim, e_t_series_ideal)
+
+        # NLL loss toward logProbability :: (B, JDist, T=spl_cnk) vs (B, T=spl_cnk)
+        loss = self.loss(permute(e_t_logp_series_estim, (0, 2, 1)), e_t_series_ideal)
 
         self.log('loss', loss) #type: ignore ; because of PyTorch-Lightning
         return {"loss": loss}
