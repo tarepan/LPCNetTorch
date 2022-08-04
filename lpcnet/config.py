@@ -62,8 +62,17 @@ data:
         n_val: 1
         n_test: 1
     dataset:
-        attr1: 1
+            adress_data_root: Optional[str] = MISSING
+
         transform: "${transform}"
+        ndim_feat: 20
+        sample_per_frame: 160
+        frame_per_chunk: 15
+        path_sample_series: ./train_waves.s16  
+        path_feat_lpc_series: ./train_features.f32
+        lpc_order: 16
+        padding_frame: 4
+        lookahead_frame: 2
     loader:
         batch_size_train: 128
         batch_size_val: 1

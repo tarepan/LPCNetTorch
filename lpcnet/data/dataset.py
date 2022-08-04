@@ -29,7 +29,6 @@ class ConfFPitchCoeffSt1nStcDataset:
     """Configuration of FPitchCoeffSt1nStc dataset.
     Args:
         adress_data_root - Root adress of data
-        att1 - Attribute #1
         ndim_feat - The size of feature series's feature dimension
         sample_per_frame - Waveform samples per acoustic frame [samples/frame]
         frame_per_chunk - Acoustic frames per training chunk [frame/chunk]
@@ -40,7 +39,6 @@ class ConfFPitchCoeffSt1nStcDataset:
         lookahead_frame - The number of lookahead [frame]
     """
     adress_data_root: Optional[str] = MISSING
-    attr1: int = MISSING
     transform: ConfTransform = ConfTransform()
     ndim_feat: int = MISSING
     sample_per_frame: int = MISSING
