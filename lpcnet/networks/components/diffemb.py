@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-from torch import nn, FloatTensor, int32, from_numpy, floor, clamp # pyright: ignore [reportUnknownVariableType]; pylint: disable=no-name-in-module
+from torch import nn, FloatTensor, int32, from_numpy, clamp, floor # pyright: ignore [reportUnknownVariableType]; pylint: disable=no-name-in-module
 from omegaconf import MISSING
 
 
@@ -33,9 +33,11 @@ class ConfDifferentialEmbedding:
     Args:
         codebook_size - The size of codebook (dictionary size)
         ndim_emb - The size of embedding dimension (embedding vector size)
+        ndims_i - The number of input's dimension
     """
     codebook_size: int = MISSING
     ndim_emb: int = MISSING
+    ndims_i: int = MISSING
 
 class DifferentialEmbedding(nn.Module):
     """Differential Embedding with interpolation."""
@@ -43,6 +45,9 @@ class DifferentialEmbedding(nn.Module):
     def __init__(self, conf: ConfDifferentialEmbedding):
         """Init."""
         super().__init__()
+
+        # Dimension size of weight
+        self._dim_weight = [-1 for _ in range(conf.ndims_i)] + [conf.ndim_emb]
 
         self._max_idx = conf.codebook_size - 1
         self.emb = proportional_emb_init(nn.Embedding(conf.codebook_size, conf.ndim_emb))
@@ -54,6 +59,7 @@ class DifferentialEmbedding(nn.Module):
         Args:
             continuous_idx :: (...) - Input tensor, last dimension is continous index (embedding target)
         """
-        weight = continuous_idx - floor(continuous_idx)
+        # :: (...) -> (..., 1) -> (..., Emb)
+        weight = (continuous_idx - floor(continuous_idx)).unsqueeze(-1).expand(self._dim_weight)
         idx_d = continuous_idx.to(int32)
         return (1-weight) * self.emb(idx_d) + weight * self.emb(clamp(idx_d+1, 0, self._max_idx))
