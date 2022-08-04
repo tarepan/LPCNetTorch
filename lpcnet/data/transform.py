@@ -6,6 +6,7 @@ from pathlib import Path
 
 from omegaconf import MISSING
 from torch import from_numpy, stack # pyright: ignore [reportUnknownVariableType] ; because of PyTorch ; pylint: disable=no-name-in-module
+import numpy as np
 
 from ..domain import FPitchCoeffSt1nStcBatch
 from .domain import FeatSeries, St1SeriesNoisy, FPitchCoeffSt1nStc, \
@@ -124,13 +125,13 @@ def augment(conf: ConfAugment, f_pitch_coeff_st1n_stc: FPitchCoeffSt1nStc) -> FP
 
     # Pass-through
     feat_series_datum:        FeatSeriesDatum     = feat_series
-    pitch_series_datum:       PitchSeriesDatum    = pitch_series
-    s_t_1_series_noisy_datum: St1SeriesNoisyDatum = s_t_1_series_noisy
-    s_t_series_clean_datum:   StSeriesCleanDatum  = s_t_series_clean
+    pitch_series_datum:       PitchSeriesDatum    = pitch_series.astype(np.int32)       # type: ignore
+    s_t_1_series_noisy_datum: St1SeriesNoisyDatum = s_t_1_series_noisy.astype(np.int32) # type: ignore
+    s_t_series_clean_datum:   StSeriesCleanDatum  = s_t_series_clean.astype(np.int32)   # type: ignore
 
     # Unneeded padding removal :: (T=frm_cnk+pad, Order) -> (T=frm_cnk, Order)
     pad_left, pad_right = (conf.padding - conf.lookahead), conf.lookahead
-    lpcoeff_series_datum: LPCoeffSeriesDatum = lpcoeff_series[:, pad_left:-pad_right]
+    lpcoeff_series_datum: LPCoeffSeriesDatum = lpcoeff_series[pad_left:-pad_right]
 
     return feat_series_datum, pitch_series_datum, lpcoeff_series_datum, s_t_1_series_noisy_datum, s_t_series_clean_datum
 

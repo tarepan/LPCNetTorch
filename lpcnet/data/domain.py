@@ -42,9 +42,9 @@ FPitchCoeffSt1nStc_: FPitchCoeffSt1nStc = (FeatSeries_, PitchSeries_, LPCoeffSer
 #     Pitch and Feature become short by padding-less ('valid') Convs, so needs padding in input
 
 FeatSeriesDatum     = NDArray[np.float32]
-PitchSeriesDatum    = NDArray[np.int16]
+PitchSeriesDatum    = NDArray[np.int32]
 LPCoeffSeriesDatum  = NDArray[np.float32]
-St1SeriesNoisyDatum = NDArray[np.int16]
-StSeriesCleanDatum  = NDArray[np.int16]
+St1SeriesNoisyDatum = NDArray[np.int32]
+StSeriesCleanDatum  = NDArray[np.int32]
 ## the datum
 FPitchCoeffSt1nStcDatum = Tuple[FeatSeriesDatum, PitchSeriesDatum, LPCoeffSeriesDatum, St1SeriesNoisyDatum, StSeriesCleanDatum]
