@@ -51,10 +51,11 @@ class ConfSampleNet:
     ndim_emb: int = MISSING
     emb: ConfDifferentialEmbedding = ConfDifferentialEmbedding(
         codebook_size=SI("${..sample_level}"),
-        ndim_emb=SI("${..ndim_emb}"),)
+        ndim_emb=SI("${..ndim_emb}"),
+        ndims_i=3,) # (B, T, 3)
     ndim_cond_feat: int = MISSING
-    size_gru_a: int = MISSING # 384
-    size_gru_b: int = MISSING # 16
+    size_gru_a: int = MISSING
+    size_gru_b: int = MISSING
     dual_fc : ConfDualFC = ConfDualFC(
         ndim_i_feat=SI("${..size_gru_b}"),
         ndim_o_feat=SI("${..sample_level}"),)
