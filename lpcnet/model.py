@@ -29,8 +29,8 @@ class ConfOptim:
         sched_decay_step: LR shaduler decay step
     """
     learning_rate: float = MISSING
-    sched_decay_rate: float = MISSING
-    sched_decay_step: int = MISSING
+    # sched_decay_rate: float = MISSING
+    # sched_decay_step: int = MISSING
 
 @dataclass
 class ConfModel:
