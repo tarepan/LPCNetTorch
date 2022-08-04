@@ -112,7 +112,7 @@ class SampleNet(nn.Module):
         i_t_series = cat([l2m(s_t_1_noisy_series), l2m(p_t_noisy_series), l2m(e_t_1_noisy_series)], dim=-1)
 
         # Additive Gaussian Noise
-        i_t_series = i_t_series + randn((ndim_b, ndim_t, 3)) * .3
+        i_t_series = i_t_series + randn((ndim_b, ndim_t, 3), device=self.device()) * .3
 
         # Embedding :: (B, T, 3) -> (B, T, 3, Emb=emb) -> (B, T, F=3*emb)
         emb_t_series: Tensor = self.emb(i_t_series).reshape(ndim_b, ndim_t, -1)
@@ -125,7 +125,7 @@ class SampleNet(nn.Module):
         self._prev_h_a = prev_h_a.detach()
 
         # Additive Gaussian Noise
-        o_rnn_a: Tensor = o_rnn_a + randn((ndim_b, ndim_t, self._size_gru_a)) * .005
+        o_rnn_a: Tensor = o_rnn_a + randn((ndim_b, ndim_t, self._size_gru_a), device=self.device()) * .005
 
         # Conditioning :: ((B, T, F=gru_a), (B, T, F=cond)) -> (B, T=t_s, F=gru_a+cond)
         i_rnn_b = cat([o_rnn_a, cond_t_s_series], dim=-1)
@@ -187,3 +187,7 @@ class SampleNet(nn.Module):
         e_t = dist_t.sample() # pyright: ignore [reportUnknownMemberType]
 
         return e_t, h_a, h_b
+
+    def device(self) -> str:
+        """Acquire current device."""
+        return str(self.gru_a.bias_hh_l0.device)
