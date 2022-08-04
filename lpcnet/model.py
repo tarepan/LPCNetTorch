@@ -80,25 +80,28 @@ class Model(pl.LightningModule):
         """(PL API) Validate the model with a batch.
         """
 
-        feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
+        # feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
-        # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
-        e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
+        # # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
+        # e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
 
-        # Loss
-        e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
-        loss_fwd = self.loss(e_t_pd_series_estim, e_t_series_ideal)
+        # # Loss
+        # e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
+        # loss_fwd = self.loss(e_t_pd_series_estim, e_t_series_ideal)
 
-        # Inference :: ... -> (Batch, T=t_s)
-        s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
+        # # Inference :: ... -> (Batch, T=t_s)
+        # s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
 
-        # Logging
-        # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
-        #                                                      ::Tensor(1, L)
-        self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self.conf.sampling_rate)
+        # # Logging
+        # # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
+        # #                                                      ::Tensor(1, L)
+        # self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self.conf.sampling_rate)
 
+        # return {
+        #     "val_loss": loss_fwd,
+        # }
         return {
-            "val_loss": loss_fwd,
+            "val_loss": 0,
         }
 
     # def test_step(self, batch, batch_idx: int): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
