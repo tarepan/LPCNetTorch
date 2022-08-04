@@ -80,6 +80,7 @@ data:
         batch_size_test: 1
         num_workers: null
         pin_memory: null
+        drop_last: True
 train:
     gradient_clipping: null
     # In original LPCNet paper, 120 epochs is 230k steps (c.f. 20epochs/767Ksteps@lpcnet_efficiency)
