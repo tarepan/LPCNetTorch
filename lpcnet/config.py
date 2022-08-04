@@ -16,6 +16,8 @@ from .model import ConfModel
 CONF_DEFAULT_STR = """
 seed: 1234
 path_extend_conf: null
+padding: 4
+lookahead: 2
 transform:
     load:
         sampling_rate: 16000
@@ -25,7 +27,8 @@ transform:
         piyo2fuga:
             div: 3.0
     augment:
-        len_clip: 10
+        padding: "${padding}"
+        lookahead: "${lookahead}"
 model:
     net:
         sample_per_frame: 160
@@ -62,8 +65,6 @@ data:
         n_val: 1
         n_test: 1
     dataset:
-            adress_data_root: Optional[str] = MISSING
-
         transform: "${transform}"
         ndim_feat: 20
         sample_per_frame: 160
@@ -71,8 +72,8 @@ data:
         path_sample_series: ./train_waves.s16  
         path_feat_lpc_series: ./train_features.f32
         lpc_order: 16
-        padding_frame: 4
-        lookahead_frame: 2
+        padding_frame: "${padding}"
+        lookahead_frame: "${lookahead}"
     loader:
         batch_size_train: 128
         batch_size_val: 1
@@ -95,11 +96,15 @@ train:
 class ConfGlobal:
     """Configuration of everything.
     Args:
-        seed: PyTorch-Lightning's seed for every random system
-        path_extend_conf: Path of configuration yaml which extends default config
+        seed - PyTorch-Lightning's seed for every random system
+        path_extend_conf - Path of configuration yaml which extends default config
+        padding - Total Padding [frame]
+        lookahead - Lookahead [frame]
     """
     seed: int = MISSING
     path_extend_conf: Optional[str] = MISSING
+    padding: int = MISSING
+    lookahead: int = MISSING
     transform: ConfTransform = ConfTransform()
     model: ConfModel = ConfModel()
     data: ConfData = ConfData()
