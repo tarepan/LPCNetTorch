@@ -67,14 +67,13 @@ class Model(pl.LightningModule):
         feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
         # Forward :: ... -> ((B, T=spl_cnk, JDist), (B, T=spl_cnk))
-        e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
-        e_t_logp_series_estim = log(e_t_pd_series_estim)
+        e_t_mlaw_logp_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
 
         # Ideal residual under noisy AR conditions
-        e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
+        e_t_mlaw_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
 
-        # NLL loss toward logProbability :: (B, JDist, T=spl_cnk) vs (B, T=spl_cnk)
-        loss = self.loss(permute(e_t_logp_series_estim, (0, 2, 1)), e_t_series_ideal)
+        # NLL loss toward Log-Probability :: (B, JDist, T=spl_cnk) vs (B, T=spl_cnk)
+        loss = self.loss(permute(e_t_mlaw_logp_series_estim, (0, 2, 1)), e_t_mlaw_series_ideal)
 
         self.log('loss', loss) #type: ignore ; because of PyTorch-Lightning
         return {"loss": loss}
@@ -83,14 +82,14 @@ class Model(pl.LightningModule):
         """(PL API) Validate the model with a batch.
         """
 
-        # feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
+        feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
-        # # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
-        # e_t_pd_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
+        # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
+        e_t_mlaw_logp_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
 
-        # # Loss
-        # e_t_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
-        # loss_fwd = self.loss(e_t_pd_series_estim, e_t_series_ideal)
+        # Loss
+        e_t_mlaw_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
+        loss_fwd = self.loss(permute(e_t_mlaw_logp_series_estim, (0, 2, 1)), e_t_mlaw_series_ideal)
 
         # # Inference :: ... -> (Batch, T=t_s)
         # s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
@@ -100,12 +99,7 @@ class Model(pl.LightningModule):
         # #                                                      ::Tensor(1, L)
         # self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self.conf.sampling_rate)
 
-        # return {
-        #     "val_loss": loss_fwd,
-        # }
-        return {
-            "val_loss": 0,
-        }
+        return {"val_loss": loss_fwd}
 
     # def test_step(self, batch, batch_idx: int): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
     #     """(PL API) Test a batch. If not provided, test_step == validation_step."""

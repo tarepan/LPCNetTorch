@@ -4,8 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from torch import Tensor, tensor, cat, repeat_interleave, roll
-import torch.nn as nn
+from torch import nn, Tensor, tensor, cat, repeat_interleave, roll # pylint: disable=no-name-in-module
 from omegaconf import MISSING, SI
 
 from ..domain import FPitchCoeffSt1nStcBatch, FeatSeriesBatched, LPCoeffSeriesBatched, PitchSeriesBatched, St1SeriesNoisyBatched
@@ -51,8 +50,8 @@ class Network(nn.Module):
         """(PT API) Forward a batch.
 
         Returns:
-            e_t_pd_series    :: (B, T=spl_cnk, JDist) - Series of residual_t's (Joint) Probability Distribution
-            p_t_noisy_series :: (B, T=spl_cnk)        - Series of linear prediction @t
+            e_t_mlaw_logp_series :: (B, T=spl_cnk, JDist) - Series of mulaw_u8pcm residual_t's (Joint) Log-Probability Distribution
+            p_t_noisy_series     :: (B, T=spl_cnk)        - Series of linear prediction @t
         """
 
         # FrameNet :: (B, T=frm_cnk+pad, F) -> (B, T=frm_cnk, F) -> (B, T=spl_cnk, F)
@@ -65,17 +64,17 @@ class Network(nn.Module):
         # Linear Prediction
         # (B, T=frm_cnk, Order) -> (B, T=spl_cnk, Order)
         lpcoeff_series = repeat_interleave(lpcoeff_series, self._sample_per_frame, dim=1)
-        # ((B, T=spl_cnk), (B, T=spl_cnk, Order)) -> (B, T=spl_cnk)
+        # ((B, T=spl_cnk), (B, T=spl_cnk, Order)) -> (B, T=spl_cnk), linear_s16
         p_t_noisy_series = linear_prediction_series(s_t_1_noisy_series, lpcoeff_series, self._order)
 
-        # Residual :: -> (B, T=spl_cnk)
+        # Residual :: -> (B, T=spl_cnk), linear_s16
         p_t_1_noisy_series = roll(p_t_noisy_series, shifts=1, dims=1)
         e_t_1_noisy_series = s_t_1_noisy_series - p_t_1_noisy_series
 
-        # SampleNet :: ((B, T), (B, T), (B, T, F)) -> (B, T, Dist)
-        e_t_pd_series: Tensor = self.sample_net(s_t_1_noisy_series, p_t_noisy_series, e_t_1_noisy_series, cond_t_s_series)
+        # SampleNet :: ((B, T), (B, T), (B, T, F)) -> (B, T, Dist), dist. of mulaw_u8pcm
+        e_t_mlaw_logp_series: Tensor = self.sample_net(s_t_1_noisy_series, p_t_noisy_series, e_t_1_noisy_series, cond_t_s_series)
 
-        return e_t_pd_series, p_t_noisy_series
+        return e_t_mlaw_logp_series, p_t_noisy_series
 
     def generate(self, batch: FPitchCoeffSt1nStcBatch) -> Tensor:
         """Run inference with a batch.

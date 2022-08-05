@@ -11,13 +11,13 @@ from omegaconf import MISSING, SI
 from .components.mulaw import lin2mlaw
 from .components.diffemb import ConfDifferentialEmbedding, DifferentialEmbedding
 from .components.dualfc import DualFC, ConfDualFC
-from .components.tree_sampling import tree_to_pdf
+from .components.tree_sampling import tree_to_pdf, tree_to_logpdf
 
 
 def l2m(linear: Tensor) -> Tensor:
     """
     Returns:
-        mulaw :: (..., 1) - Unsqueezed μ-law signal
+        mulaw :: (..., 1) - Unsqueezed μ-law u8-scale signal
     """
     return lin2mlaw(linear).unsqueeze(-1)
 
@@ -96,15 +96,15 @@ class SampleNet(nn.Module):
         ) -> Tensor:
         """(PT API) Forward a batch.
 
-        Generate the probability distribution of residual@t (e_t) from ARs (s_t_1 & e_t_1) and LinearPrediction (p_t)
+        Generate the log probability distribution of residual@t (e_t) from ARs (s_t_1 & e_t_1), LinearPrediction (p_t) and conditioning (cond_t_s)
 
         Args:
-            s_t_1_noisy_series :: (B, T=t_s)    - Lagged/Delayed sample series (waveform) with noise
-            p_t_noisy_series   :: (B, T=t_s)    - Linear Prediction series with noise
-            e_t_1_noisy_series :: (B, T=t_s)    - Lagged/Delayed residual series with noise
-            cond_t_s_series    :: (B, T=t_s, F) - Conditioning vector series with sample-series time scale
+            s_t_1_noisy_series   :: (B, T=t_s)        - Lagged/Delayed sample series (waveform) with noise, linear_s16pcm
+            p_t_noisy_series     :: (B, T=t_s)        - Linear Prediction series with noise,                linear_s16
+            e_t_1_noisy_series   :: (B, T=t_s)        - Lagged/Delayed residual series with noise,          linear_s16
+            cond_t_s_series      :: (B, T=t_s, F)     - Conditioning vector series with sample-series time scale
         Returns:
-            e_t_pd_series :: (B, T=t_s, JDist) - Series of residual_t's (Joint) Probability Distribution
+            e_t_mlaw_logp_series :: (B, T=t_s, JDist) - Series of mulaw_u8pcm residual_t's (Joint) Log-Probability Distribution
         """
 
         ndim_b, ndim_t = tuple(s_t_1_noisy_series.size())
@@ -138,10 +138,10 @@ class SampleNet(nn.Module):
         # DualFC :: (B, T, F) -> (B, T, CProb=2**Q)
         bit_cond_probs = self.dual_fc(o_rnn_b)
 
-        # P(e_t) series :: (B, T, CProb=2**Q) -> (B, T, JDist=2**Q)
-        e_t_pd_series = tree_to_pdf(bit_cond_probs)
+        # Log(P(e_t)) series :: (B, T, CProb=2**Q) -> (B, T, JDist=2**Q)
+        e_t_mlaw_logp_series = tree_to_logpdf(bit_cond_probs)
 
-        return e_t_pd_series
+        return e_t_mlaw_logp_series
 
     def update_gru_cells(self) -> None:
         """Transfer weights of GRU_A and GRU_B to cells."""
@@ -162,17 +162,17 @@ class SampleNet(nn.Module):
         Generate the probability distribution of residual@t (e_t) from ARs (s_t_1 & e_t_1) and LinearPrediction (p_t)
 
         Args:
-            p_t      :: (B,)   - Linear Prediction @t
-            s_t_1    :: (B,)   - Sample @t-1
-            e_t_1    :: (B,)   - Residual @t-1
-            cond_t   :: (B, F) - Conditioning vector @t
+            s_t_1    :: (B,)   - Sample               @t-1, linear_s16pcm
+            p_t      :: (B,)   - Linear Prediction    @t,   linear_s16
+            e_t_1    :: (B,)   - Residual             @t-1, linear_s16
+            cond_t   :: (B, F) - Conditioning vector  @t
             prev_h_a :: (B, F) - GRU_A's hidden state @t-1, None means h_a=0
             prev_h_b :: (B, F) - GRU_B's hidden state @t-1, None means h_b=0
             ndim_b             - Batch size
         Returns:
-            e_t :: (B,)   - generated residual @t
-            h_a :: (B, F) - GRU_A's hidden state @t
-            h_b :: (B, F) - GRU_B's hidden state @t
+            e_t      :: (B,)   - generated residual   @t,   mulaw_u8
+            h_a      :: (B, F) - GRU_A's hidden state @t
+            h_b      :: (B, F) - GRU_B's hidden state @t
         """
 
         # Embedding (w/o noise) :: ((B,), (B,), (B,)) -> (B, F=3*emb)

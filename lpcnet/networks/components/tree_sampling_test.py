@@ -1,8 +1,8 @@
 """Test tree sampling"""
 
-from torch import Tensor, tensor, float64, equal # pylint: disable=no-name-in-module
+from torch import Tensor, tensor, float64, abs, all, equal, log # pylint: disable=no-name-in-module,redefined-builtin
 
-from .tree_sampling import _cprobs_to_cdist, tree_to_pdf # pyright: ignore [reportPrivateUsage]
+from .tree_sampling import _cprobs_to_cdist, tree_to_pdf, tree_to_logpdf # pyright: ignore [reportPrivateUsage]
 
 
 def test_cprobs_to_cdist():
@@ -83,3 +83,35 @@ def test_tree_to_pdf():
     joint_dist_estim = tree_to_pdf(bit_cond_probs_all)
 
     assert equal(joint_dist_estim, joint_dist_gt)
+
+
+def test_tree_to_logpdf():
+    """Test `tree_to_logpdf` function."""
+
+    # P(bit_k|bit_<k) :: (B=1, T_s=1, Cond=2**3)
+    bit_cond_probs_all: Tensor = tensor([
+        [ # batch_1
+            [1.0, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4,], # t_0
+        #   | - | L1 |    L2   |        L3         |
+        ],
+    ], dtype=float64)
+
+    # P(level) :: (B=1, T_s=1, Dist=2**3)
+    logp_gt: Tensor = log(tensor([
+        [ # batch_0
+            [ # time_0
+                (1.0-0.3) * (1.0-0.4) * (1.0-0.1), # 000
+                (1.0-0.3) * (1.0-0.4) *      0.1 , # 001
+                (1.0-0.3) *      0.4  * (1.0-0.2), # 010
+                (1.0-0.3) *      0.4  *      0.2 , # 011
+                     0.3  * (1.0-0.5) * (1.0-0.3), # 100
+                     0.3  * (1.0-0.5) *      0.3 , # 101
+                     0.3  *      0.5  * (1.0-0.4), # 110
+                     0.3  *      0.5  *      0.4 , # 111
+        ],
+    ]], dtype=float64))
+
+    logp_estim = tree_to_logpdf(bit_cond_probs_all)
+
+    # There are tiny numerical difference between 'logΠp' and 'Σlogp'
+    assert all(abs(logp_estim - logp_gt) < 0.0000000001)
