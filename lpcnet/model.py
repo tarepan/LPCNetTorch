@@ -85,7 +85,7 @@ class Model(pl.LightningModule):
         feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
         # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
-        e_t_mlaw_logp_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
+        e_t_mlaw_logp_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, stateful=False)
 
         # Loss
         e_t_mlaw_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)

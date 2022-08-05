@@ -93,6 +93,7 @@ class SampleNet(nn.Module):
         p_t_noisy_series: Tensor,
         e_t_1_noisy_series: Tensor,
         cond_t_s_series: Tensor,
+        stateful: bool = True,
         ) -> Tensor:
         """(PT API) Forward a batch.
 
@@ -122,8 +123,8 @@ class SampleNet(nn.Module):
         i_rnn_a = cat([emb_t_series, cond_t_s_series], dim=-1)
 
         # GRU_A :: (B, T, F) -> ((B, T, F=gru_a), (B, F))
-        o_rnn_a, prev_h_a = self.gru_a(i_rnn_a, self._prev_h_a)
-        self._prev_h_a = prev_h_a.detach()
+        o_rnn_a, prev_h_a = self.gru_a(i_rnn_a, self._prev_h_a if stateful else None)
+        self._prev_h_a = prev_h_a.detach() if stateful else None
 
         # Additive Gaussian Noise
         o_rnn_a: Tensor = o_rnn_a + randn((ndim_b, ndim_t, self._size_gru_a), device=self.device()) * .005
@@ -132,8 +133,8 @@ class SampleNet(nn.Module):
         i_rnn_b = cat([o_rnn_a, cond_t_s_series], dim=-1)
 
         # GRU_B :: (B, T, F) -> ((B, T, F), (B, F))
-        o_rnn_b, prev_h_b = self.gru_b(i_rnn_b, self._prev_h_b)
-        self._prev_h_b = prev_h_b.detach()
+        o_rnn_b, prev_h_b = self.gru_b(i_rnn_b, self._prev_h_b if stateful else None)
+        self._prev_h_b = prev_h_b.detach() if stateful else None
 
         # DualFC :: (B, T, F) -> (B, T, CProb=2**Q)
         bit_cond_probs = self.dual_fc(o_rnn_b)
