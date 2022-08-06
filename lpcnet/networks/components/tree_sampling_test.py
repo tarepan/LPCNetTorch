@@ -8,8 +8,6 @@ from .tree_sampling import _cprobs_to_cdist, tree_to_pdf, tree_to_logpdf # pyrig
 def test_cprobs_to_cdist():
     """Test `_cprobs_to_cdist` function."""
 
-    batch_size = 2
-    t_sample = 3
     bit_depth = 3
 
     # P(bit_k|bit_<k) :: (Batch, Time, Bit)
@@ -49,7 +47,7 @@ def test_cprobs_to_cdist():
         ],
     ], dtype=float64)
 
-    l3_cond_probs = _cprobs_to_cdist(l3, bit_depth, layer, batch_size, t_sample)
+    l3_cond_probs = _cprobs_to_cdist(l3, bit_depth, layer)
 
     assert equal(l3_cond_probs, l3_gt)
 
