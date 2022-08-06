@@ -94,6 +94,9 @@ class Network(nn.Module):
         # Update cell parameters
         self.sample_net.update_gru_cells()
 
+        # Acquire device
+        device = self.device()
+
         # Feat2Cond :: (B, T, F) -> (B, T=t_f, F) -> (B, T=t_s, F)
         cond_t_f_series: Tensor = self.frame_net(feat_series, pitch_series)
         cond_t_s_series = repeat_interleave(cond_t_f_series, self._sample_per_frame, dim=1)
@@ -103,11 +106,11 @@ class Network(nn.Module):
 
         # Sample Generation
         ndim_b, len_t, _ = cond_t_s_series.size()
-        s_t_n = tensor([[0 for _ in range(self._order)] for _ in range(ndim_b)], dtype=int32) # (B, T=order) - s_{t-1} ~ s_{t-order}, zeros of linear_s16pcm
-        e_t_1 = tensor([0 for _ in range(ndim_b)], dtype=int32) # (B,) - e_{t-1}, zeros of linear_s16pcm
+        s_t_n = tensor([[0 for _ in range(self._order)] for _ in range(ndim_b)], dtype=int32, device=device) # (B, T=order) - s_{t-1} ~ s_{t-order}, zeros of linear_s16pcm
+        e_t_1 = tensor([0 for _ in range(ndim_b)],                               dtype=int32, device=device) # (B,) - e_{t-1}, zeros of linear_s16pcm
         h_a: Optional[Tensor] = None # (B, Hidden) - GRU_A hidden state
         h_b: Optional[Tensor] = None # (B, Hidden) - GRU_B hidden state
-        s_t_series_estim: Tensor = tensor([[] for _ in range(ndim_b)], dtype=int32) # (B, T) - Generated sample series
+        s_t_series_estim: Tensor = tensor([[] for _ in range(ndim_b)],           dtype=int32, device=device) # (B, T) - Generated sample series
         for i in range(len_t):
             coeff_t, cond_t = lpcoeff_series[:, i], cond_t_s_series[:, i]
 
@@ -129,3 +132,7 @@ class Network(nn.Module):
             e_t_1 = e_t
 
         return s_t_series_estim
+
+    def device(self) -> str:
+        """Acquire current device."""
+        return self.sample_net.device()
