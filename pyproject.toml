@@ -20,7 +20,7 @@ configen = {git = "https://github.com/tarepan/configen.git", rev = "main"}
 lightlightning = {git = "https://github.com/tarepan/lightlightning.git", rev = "main"}
 ## Dependencies for Audio
 # pyloudnorm = "^0.1.0"
-# librosa = "^0.8.0"
+# librosa = "^0.9.2"
 ## Poetry is not good for version control of PyTorch (it has many many variants for a version, so poetry become confused)
 ## torch = "1.11.0"
 ## torchaudio = "*"
