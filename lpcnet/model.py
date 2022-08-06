@@ -36,6 +36,7 @@ class ConfOptim:
 class ConfModel:
     """Configuration of the Model.
     """
+    sampling_rate: int = MISSING
     net: ConfNetwork = ConfNetwork()
     optim: ConfOptim = ConfOptim()
     transform: ConfTransform = ConfTransform()
@@ -48,16 +49,16 @@ class Model(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self._conf = conf
-        self._net = Network(conf.net)
+        self.net = Network(conf.net)
         self.loss = nn.NLLLoss()
 
     def forward(self, batch: FPitchCoeffSt1nStcBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
         """(PL API) Run inference toward a batch.
+        Returns:
+            (Batch, T) - Generated sample series, linear_s16pcm
         """
-        hoge, _, _ = batch
-
-        # Inference :: (Batch, T, Feat=dim_i) -> (Batch, T, Feat=dim_o)
-        return self._net.generate(hoge)
+        feat_series, pitch_series, lpcoeff_series, _, _ = batch
+        return self.net.generate(feat_series, pitch_series, lpcoeff_series)
 
     # Typing of PL step API is poor. It is typed as `(self, *args, **kwargs)`.
     def training_step(self, batch: FPitchCoeffSt1nStcBatch): # pyright: ignore [reportIncompatibleMethodOverride] ; pylint: disable=arguments-differ
@@ -67,7 +68,7 @@ class Model(pl.LightningModule):
         feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
         # Forward :: ... -> ((B, T=spl_cnk, JDist), (B, T=spl_cnk))
-        e_t_mlaw_logp_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
+        e_t_mlaw_logp_series_estim, p_t_noisy_series = self.net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series)
 
         # Ideal residual under noisy AR conditions
         e_t_mlaw_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
@@ -85,19 +86,19 @@ class Model(pl.LightningModule):
         feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series = batch
 
         # Forward :: ... -> ((B, T=t_s, JDist), (B, T=t_s,))
-        e_t_mlaw_logp_series_estim, p_t_noisy_series = self._net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, stateful=False)
+        e_t_mlaw_logp_series_estim, p_t_noisy_series = self.net(feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, stateful=False)
 
         # Loss
         e_t_mlaw_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
         loss_fwd = self.loss(permute(e_t_mlaw_logp_series_estim, (0, 2, 1)), e_t_mlaw_series_ideal)
 
-        # # Inference :: ... -> (Batch, T=t_s)
-        # s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
+        # Inference :: ... -> (Batch, T=t_s), linear_s16pcm
+        s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
 
-        # # Logging
-        # # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
-        # #                                                      ::Tensor(1, L)
-        # self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self.conf.sampling_rate)
+        # Logging
+        # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
+        #                                                      ::Tensor(1, L)
+        self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self._conf.sampling_rate) # type: ignore
 
         return {"val_loss": loss_fwd}
 
@@ -111,7 +112,7 @@ class Model(pl.LightningModule):
         conf = self._conf.optim
         decay: float = 2.5e-5
 
-        optim = Adam(self._net.parameters(), lr=conf.learning_rate, betas=(0.9, 0.99), eps=1e-07)
+        optim = Adam(self.net.parameters(), lr=conf.learning_rate, betas=(0.9, 0.99), eps=1e-07)
         sched = {
             "scheduler": LambdaLR(optim, lr_lambda=lambda step: 1./(1. + decay * step)),
             "interval": "step",

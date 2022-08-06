@@ -4,13 +4,14 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from torch import nn, Tensor, tensor, cat, repeat_interleave, roll # pylint: disable=no-name-in-module
+from torch import nn, Tensor, tensor, int32, cat, repeat_interleave, roll # pylint: disable=no-name-in-module
 from omegaconf import MISSING, SI
 
-from ..domain import FPitchCoeffSt1nStcBatch, FeatSeriesBatched, LPCoeffSeriesBatched, PitchSeriesBatched, St1SeriesNoisyBatched
+from ..domain import FeatSeriesBatched, LPCoeffSeriesBatched, PitchSeriesBatched, St1SeriesNoisyBatched
 from .framenet import FrameNet, ConfFrameNet
 from .samplenet import SampleNet, ConfSampleNet
 from .components.linear_prediction import linear_prediction, linear_prediction_series
+from .components.mulaw import linear_s16pcm, mlaw2lin
 
 
 @dataclass
@@ -79,51 +80,52 @@ class Network(nn.Module):
 
         return e_t_mlaw_logp_series, p_t_noisy_series
 
-    def generate(self, batch: FPitchCoeffSt1nStcBatch) -> Tensor:
+    def generate(self,
+        feat_series: FeatSeriesBatched,
+        pitch_series: PitchSeriesBatched,
+        lpcoeff_series: LPCoeffSeriesBatched,
+        ) -> Tensor:
         """Run inference with a batch.
 
-        Args:
-            batch - Series of s_t_1 / pitch / Feature / LPCoefficient
         Returns:
-            o_pred :: (Batch, T, Feat=dim_o) - Prediction
+            s_t_series_estim :: (Batch, T) - Generated waveform, linear_s16pcm
         """
-
-        _, feat_series, pitch_series, lpcoeff_series = batch
 
         # Update cell parameters
         self.sample_net.update_gru_cells()
 
-        # Feat2Cond :: (B, T=t_f, F) -> (B, T=<t_f, F) -> (B, T=<t_s, F)
+        # Feat2Cond :: (B, T, F) -> (B, T=t_f, F) -> (B, T=t_s, F)
         cond_t_f_series: Tensor = self.frame_net(feat_series, pitch_series)
         cond_t_s_series = repeat_interleave(cond_t_f_series, self._sample_per_frame, dim=1)
 
-        # Coeff upsampling
+        # Coeff upsampling :: (B, T=t_f, Order) -> (B, T=t_s, Order)
         lpcoeff_series = repeat_interleave(lpcoeff_series, self._sample_per_frame, dim=1)
 
-        # :: (Batch, T, Feat=dim_i) -> (Batch, T, Feat=dim_o)
-        ndim_b: int = lpcoeff_series.size()[0]
-        s_t_n: Tensor = tensor([128. for _ in range(ndim_b)]) # (B, Order)
-        e_t_1: Tensor = tensor([128. for _ in range(ndim_b)]) # (B,)
-        cond_t: Tensor =
-        # GRU hidden states
-        h_a: Optional[Tensor] = None
-        h_b: Optional[Tensor] = None
-        # :: (B, T)
-        s_t_series: Tensor = 
-
         # Sample Generation
-        for _ in range(cond_scale):
-            # :: ((B, Order), (Order)) -> (B,)
-            p_t = linear_prediction(s_t_n, coeffs)
-            # :: -> ((B,), (B, F), (B, F))
-            e_t, h_a, h_b = self.sample_net.generate(s_t_n[:, 0], p_t, e_t_1, cond_t, h_a, h_b, ndim_b)
-            # ((B,), (B,)) -> (B, 1)
-            s_t_pred = (p_t + e_t).unsqueeze(-1)
+        ndim_b, len_t, _ = cond_t_s_series.size()
+        s_t_n = tensor([[0 for _ in range(self._order)] for _ in range(ndim_b)], dtype=int32) # (B, T=order) - s_{t-1} ~ s_{t-order}, zeros of linear_s16pcm
+        e_t_1 = tensor([0 for _ in range(ndim_b)], dtype=int32) # (B,) - e_{t-1}, zeros of linear_s16pcm
+        h_a: Optional[Tensor] = None # (B, Hidden) - GRU_A hidden state
+        h_b: Optional[Tensor] = None # (B, Hidden) - GRU_B hidden state
+        s_t_series_estim: Tensor = tensor([[] for _ in range(ndim_b)], dtype=int32) # (B, T) - Generated sample series
+        for i in range(len_t):
+            coeff_t, cond_t = lpcoeff_series[:, i], cond_t_s_series[:, i]
+
+            # Linear Prediction :: ((B, T=order), (Order=order)) -> (B,)
+            p_t = linear_prediction(s_t_n, coeff_t)
+
+            # Residual sampling :: -> ((B,), (B, F), (B, F))
+            e_t_mlaw, h_a, h_b = self.sample_net.generate(s_t_n[:, 0], p_t, e_t_1, cond_t, h_a, h_b, ndim_b)
+            e_t = mlaw2lin(e_t_mlaw) # mlaw_u8pcm -> linear_s16
+
+            # Sample :: ((B,), (B,)) -> (B, 1), linear_s16pcm
+            s_t_estim = linear_s16pcm(p_t + e_t).unsqueeze(-1)
+
             # Record :: ((B, T=t), (B, 1)) -> (B, T=t+1)
-            s_t_series = cat((s_t_series, s_t_pred), dim=-1)
-            # AR - Samples :: ((B, 1), (B, Order=order-1)) -> (B, Order=order)
-            s_t_n = cat([s_t_pred, s_t_n[:, :-1]], dim=-1)
-            # AR - Residual
+            s_t_series_estim = cat((s_t_series_estim, s_t_estim), dim=-1)
+            # AR - Samples :: ((B, T=1), (B, T=order-1)) -> (B, T=order)
+            s_t_n = cat([s_t_estim, s_t_n[:, :-1]], dim=-1)
+            # AR - Residual, μlaw-scale
             e_t_1 = e_t
 
-        return s_t_series
+        return s_t_series_estim

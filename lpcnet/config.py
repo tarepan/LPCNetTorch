@@ -30,6 +30,7 @@ transform:
         padding: "${padding}"
         lookahead: "${lookahead}"
 model:
+    sampling_rate: 16000
     net:
         sample_per_frame: 160
         lp_order: 16
