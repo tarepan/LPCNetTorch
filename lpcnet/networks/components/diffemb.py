@@ -46,9 +46,6 @@ class DifferentialEmbedding(nn.Module):
         """Init."""
         super().__init__()
 
-        # Dimension size of weight
-        self._dim_weight = [-1 for _ in range(conf.ndims_i)] + [conf.ndim_emb]
-
         self._max_idx = conf.codebook_size - 1
         self.emb = proportional_emb_init(nn.Embedding(conf.codebook_size, conf.ndim_emb))
 
@@ -60,6 +57,6 @@ class DifferentialEmbedding(nn.Module):
             continuous_idx :: (...) - Input tensor, last dimension is continous index (embedding target)
         """
         # :: (...) -> (..., 1) -> (..., Emb)
-        weight = (continuous_idx - floor(continuous_idx)).unsqueeze(-1).expand(self._dim_weight)
+        weight = (continuous_idx - floor(continuous_idx)).unsqueeze(-1)
         idx_d = continuous_idx.to(int32)
         return (1-weight) * self.emb(idx_d) + weight * self.emb(clamp(idx_d+1, 0, self._max_idx))
