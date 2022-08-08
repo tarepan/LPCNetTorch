@@ -154,7 +154,7 @@ class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
     def __getitem__(self, n: int) -> FPitchCoeffSt1nStcDatum:
         """(API) Load the n-th datum from the dataset with tranformation.
         """
-        if self._mode != "train":
+        if self._mode == "train":
             feat_series:        FeatSeries     =         self._feat_series[n]
             pitch_series:       PitchSeries    = self._pitch_period_series[n]
             lpcoeff_series:     LPCoeffSeries  =      self._lpcoeff_series[n]
@@ -193,7 +193,7 @@ class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
             return (feat_series_datum, pitch_series_datum, lpcoeff_series_datum, s_t_1_noisy_series_datum, s_t_clean_series_datum)
 
     def __len__(self) -> int:
-        if self._mode != "train":
+        if self._mode == "train":
             return len(self._s_t_1_noisy_series)
         else:
             return 3
