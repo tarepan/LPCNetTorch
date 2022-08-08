@@ -17,7 +17,7 @@ from speechdatasety.helper.adress import dataset_adress                         
 from speechdatasety.helper.access import generate_saver_loader                          # pyright: ignore [reportMissingTypeStubs]
 
 from ..domain import FPitchCoeffSt1nStcBatch
-from .domain import FeatSeries, PitchSeries, LPCoeffSeries, St1SeriesNoisy, StSeriesClean, FPitchCoeffSt1nStcDatum
+from .domain import FeatSeries, FeatSeriesDatum, LPCoeffSeriesDatum, PitchSeries, LPCoeffSeries, PitchSeriesDatum, St1SeriesNoisy, St1SeriesNoisyDatum, StSeriesClean, FPitchCoeffSt1nStcDatum, StSeriesCleanDatum
 from .transform import ConfTransform, load_raw, preprocess, augment, collate
 
 
@@ -53,7 +53,7 @@ class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
     """The Feat/Pitch/LPCoeff/S_t_1_noisy/S_t_clean dataset from the corpus.
     """
 
-    def __init__(self, conf: ConfFPitchCoeffSt1nStcDataset, items: CorpusItems):
+    def __init__(self, conf: ConfFPitchCoeffSt1nStcDataset, items: CorpusItems, mode: str = "train"):
         """
         Args:
             conf: The Configuration
@@ -62,6 +62,7 @@ class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
 
         # Store parameters
         self._conf = conf
+        self._mode = mode
         # self._corpus = items[0]
         # self._items = items[1]
 
@@ -119,7 +120,6 @@ class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
             shape=(num_chunk, conf.frame_per_chunk + conf.padding_frame, dim_feat_lpc),
             strides=(byte_chunk, byte_frame, byte_value)
         )
-
         # :: (Chunk, ...FeatSeries)
         self._feat_series    = feat_lpc_series[:, :,                  :-1*conf.lpc_order]
         # :: (Chunk, ...LPCoeffSeries)
@@ -154,16 +154,49 @@ class FPitchCoeffSt1nStcDataset(Dataset[FPitchCoeffSt1nStcDatum]):
     def __getitem__(self, n: int) -> FPitchCoeffSt1nStcDatum:
         """(API) Load the n-th datum from the dataset with tranformation.
         """
-        feat_series:        FeatSeries     =         self._feat_series[n]
-        pitch_series:       PitchSeries    = self._pitch_period_series[n]
-        lpcoeff_series:     LPCoeffSeries  =      self._lpcoeff_series[n]
-        s_t_1_noisy_series: St1SeriesNoisy =  self._s_t_1_noisy_series[n]
-        s_t_clean_series:   StSeriesClean  =    self._s_t_clean_series[n]
+        if self._mode != "train":
+            feat_series:        FeatSeries     =         self._feat_series[n]
+            pitch_series:       PitchSeries    = self._pitch_period_series[n]
+            lpcoeff_series:     LPCoeffSeries  =      self._lpcoeff_series[n]
+            s_t_1_noisy_series: St1SeriesNoisy =  self._s_t_1_noisy_series[n]
+            s_t_clean_series:   StSeriesClean  =    self._s_t_clean_series[n]
 
-        return augment(self._conf.transform.augment, (feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series))
+            return augment(self._conf.transform.augment, (feat_series, pitch_series, lpcoeff_series, s_t_1_noisy_series, s_t_clean_series))
+        else:
+            # 150 [msec/chunk] * 30 [chunk] == 4.5 [sec]
+            # Unneeded padding removal :: (T=frm_cnk+pad, Order) -> (T=frm_cnk, Order)
+            pad_left, pad_right = (self._conf.transform.augment.padding - self._conf.transform.augment.lookahead), self._conf.transform.augment.lookahead
+
+            feat_series_chunks                            =         self._feat_series[n*30: (n+1)*30]
+            pitch_series_chunks                           = self._pitch_period_series[n*30: (n+1)*30].astype(np.int32)
+            lpcoeff_series_chunks                         =      self._lpcoeff_series[n*30: (n+1)*30]
+            s_t_1_noisy_series_datum: St1SeriesNoisyDatum =  self._s_t_1_noisy_series[n*30: (n+1)*30].reshape(-1).astype(np.int32)
+            s_t_clean_series_datum:   StSeriesCleanDatum  =    self._s_t_clean_series[n*30: (n+1)*30].reshape(-1).astype(np.int32)
+
+            # :: (T=t_f+pad, Order)
+            feat_series_datum: FeatSeriesDatum = np.concatenate([ # pyright: ignore [reportUnknownMemberType]
+                feat_series_chunks[0,             :-pad_right],                                   # (T=padL+frm_cnk)
+                feat_series_chunks[1:-1,  pad_left:-pad_right].reshape(-1, self._conf.ndim_feat), # (Chunk=c-2, T=frm_cnk, F) -> (T=(c-2)*frm_cnk, F)
+                feat_series_chunks[-1,    pad_left:          ],                                   # (T=frm_cnk+padR)
+            ], 0)
+
+            # :: (T=t_f+pad,)
+            pitch_series_datum: PitchSeriesDatum = np.concatenate([ # pyright: ignore [reportUnknownMemberType]
+            pitch_series_chunks[0,             :-pad_right],             # (T=padL+frm_cnk)
+            pitch_series_chunks[1:-1,  pad_left:-pad_right].reshape(-1), # (Chunk=c-2, T=frm_cnk) -> (T=(c-2)*frm_cnk)
+            pitch_series_chunks[-1,    pad_left:          ],             # (T=frm_cnk+padR)
+            ], 0)
+
+            # :: (Chunk, T=frm_cnk+pad, Order) -> (Chunk, T=frm_cnk, Order) -> (T=t_f, Order)
+            lpcoeff_series_datum:     LPCoeffSeriesDatum  = lpcoeff_series_chunks[:, pad_left:-pad_right].reshape(-1, self._conf.lpc_order)
+
+            return (feat_series_datum, pitch_series_datum, lpcoeff_series_datum, s_t_1_noisy_series_datum, s_t_clean_series_datum)
 
     def __len__(self) -> int:
-        return len(self._s_t_1_noisy_series)
+        if self._mode != "train":
+            return len(self._s_t_1_noisy_series)
+        else:
+            return 3
 
     def collate_fn(self, items: List[FPitchCoeffSt1nStcDatum]) -> FPitchCoeffSt1nStcBatch:
         """(API) datum-to-batch function."""
