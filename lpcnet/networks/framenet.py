@@ -23,14 +23,14 @@ class ConfFrameNet:
         num_conv_layer  - The number of convolutional layers
         num_segfc_layer - The number of segmental FC layers
     """
-    ndim_i_feat: int = MISSING # 20
-    codebook_size: int = MISSING # SIZE_PITCH_CODEBOOK == 256
-    ndim_emb: int = MISSING # DIM_PITCH_EMB == 64
-    ndim_h_o_feat: int = MISSING # 128
-    kernel_size: int = MISSING # 3
-    num_conv_layer: int = MISSING # 2
-    num_segfc_layer: int = MISSING # 2
-    padding: int = MISSING # 4
+    ndim_i_feat: int = MISSING
+    codebook_size: int = MISSING
+    ndim_emb: int = MISSING
+    ndim_h_o_feat: int = MISSING
+    kernel_size: int = MISSING
+    num_conv_layer: int = MISSING
+    num_segfc_layer: int = MISSING
+    padding: int = MISSING
 
 
 class FrameNet(nn.Module):
