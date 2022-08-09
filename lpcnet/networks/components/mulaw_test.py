@@ -2,7 +2,7 @@
 
 from torch import tensor, float32, int32, int64, equal # pylint: disable=no-name-in-module,redefined-builtin
 
-from .mulaw import lin2mlaw, lin2mlawpcm, linear_s16pcm, mlaw2lin
+from .mulaw import lin2mlaw, lin2mlawpcm, linear_s16pcm, mlaw2lin, s16pcm_to_unit
 
 
 def test_linear_pcm():
@@ -96,3 +96,15 @@ def test_mlaw_conversion():
     assert equal(mlaw2lin(lin2mlaw(i_min)),  i_min)
     assert equal(mlaw2lin(lin2mlaw(i_zero)), i_zero)
     assert equal(mlaw2lin(lin2mlaw(i_max)),  i_max_gt)
+
+
+def test_s16pcm_to_unit():
+    """Test `s16pcm_to_unit` function."""
+
+    i_min , i_min_gt  = tensor(-32768, dtype=int32), tensor(-1., dtype=float32)
+    i_zero, i_zero_gt = tensor(     0, dtype=int32), tensor( 0., dtype=float32)
+    i_max , i_max_gt  = tensor(+32768, dtype=int32), tensor(+1., dtype=float32)
+
+    assert equal(s16pcm_to_unit(i_min),  i_min_gt)
+    assert equal(s16pcm_to_unit(i_zero), i_zero_gt)
+    assert equal(s16pcm_to_unit(i_max),  i_max_gt)

@@ -83,3 +83,14 @@ def mlaw2lin(mlaw_u8: Tensor) -> Tensor:
     mlaw_u8 = clamp(scale_s16 * linear, min=-32768., max=+32767.)
 
     return mlaw_u8
+
+
+def s16pcm_to_unit(s16pcm: Tensor) -> Tensor:
+    """Scale s16pcm into [-1,1].
+
+    Args:
+        s16pcm :: (...) - [-32768, +32768)
+    Returns:
+        unit   :: (...) - [-1, 1)
+    """
+    return s16pcm / 32768.

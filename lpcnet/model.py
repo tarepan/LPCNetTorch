@@ -17,7 +17,7 @@ from .domain import FPitchCoeffSt1nStcBatch
 from .data.domain import St1SeriesNoisyDatum
 from .data.transform import ConfTransform, augment, collate, load_raw, preprocess
 from .networks.network import Network, ConfNetwork
-from .networks.components.mulaw import lin2mlawpcm
+from .networks.components.mulaw import lin2mlawpcm, s16pcm_to_unit
 
 
 @dataclass
@@ -92,13 +92,15 @@ class Model(pl.LightningModule):
         e_t_mlaw_series_ideal = lin2mlawpcm(s_t_clean_series - p_t_noisy_series)
         loss_fwd = self.loss(permute(e_t_mlaw_logp_series_estim, (0, 2, 1)), e_t_mlaw_series_ideal)
 
-        # Inference :: ... -> (Batch, T=t_s), linear_s16pcm
+        # Inference :: ... -> (Batch, T=t_s), linear_s16
         s_t_series_estim = self.net.generate(feat_series, pitch_series, lpcoeff_series)
+        s_t_series_estim_unit = s16pcm_to_unit(s_t_series_estim)
+
 
         # Logging
         # [PyTorch](https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_audio)
         #                                                      ::Tensor(1, L)
-        self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim, global_step=self.global_step, sample_rate=self._conf.sampling_rate) # type: ignore
+        self.logger.experiment.add_audio(f"audio_{batch_idx}", s_t_series_estim_unit, global_step=self.global_step, sample_rate=self._conf.sampling_rate) # type: ignore
 
         return {"val_loss": loss_fwd}
 
