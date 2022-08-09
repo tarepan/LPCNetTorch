@@ -85,8 +85,8 @@ data:
 train:
     gradient_clipping: null
     # In original LPCNet paper, 120 epochs is 230k steps (c.f. 20epochs/767Ksteps@lpcnet_efficiency)
-    max_epochs: 10000
-    val_interval_epoch: 10
+    max_epochs: 1000
+    val_interval_epoch: 3
     profiler: null
     ckpt_log:
         dir_root: "."
