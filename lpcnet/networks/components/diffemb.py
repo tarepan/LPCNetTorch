@@ -58,5 +58,6 @@ class DifferentialEmbedding(nn.Module):
         """
         # :: (...) -> (..., 1) -> (..., Emb)
         weight = (continuous_idx - floor(continuous_idx)).unsqueeze(-1)
-        idx_d = continuous_idx.to(int32)
-        return (1-weight) * self.emb(idx_d) + weight * self.emb(clamp(idx_d+1, 0, self._max_idx))
+        idx_d   = clamp(continuous_idx.to(int32), 0, self._max_idx)
+        idx_d_1 = clamp(idx_d+1,                  0, self._max_idx)
+        return (1-weight) * self.emb(idx_d) + weight * self.emb(idx_d_1)
