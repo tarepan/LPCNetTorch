@@ -48,6 +48,7 @@ model:
             ndim_emb: 128
             size_gru_a: 384
             size_gru_b: 16
+            noise_gru: 0.005
     optim:
         learning_rate: 0.001
     transform: "${transform}"

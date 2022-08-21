@@ -56,6 +56,7 @@ class ConfSampleNet:
     ndim_cond_feat: int = MISSING
     size_gru_a: int = MISSING
     size_gru_b: int = MISSING
+    noise_gru: float = MISSING
     dual_fc : ConfDualFC = ConfDualFC(
         ndim_i_feat=SI("${..size_gru_b}"),
         ndim_o_feat=SI("${..sample_level}"),)
@@ -66,6 +67,7 @@ class SampleNet(nn.Module):
     def __init__(self, conf: ConfSampleNet):
         super().__init__()
         self._size_gru_a = conf.size_gru_a
+        self._noise_gru = conf.noise_gru
 
         # Shared signal embedding (for s/sample, p/LP, e/residual)
         self.emb = DifferentialEmbedding(conf.emb)
@@ -127,7 +129,7 @@ class SampleNet(nn.Module):
         self._prev_h_a = prev_h_a.detach() if stateful else None
 
         # Additive Gaussian Noise
-        o_rnn_a: Tensor = o_rnn_a + randn((ndim_b, ndim_t, self._size_gru_a), device=self.device()) * .005
+        o_rnn_a: Tensor = o_rnn_a + randn((ndim_b, ndim_t, self._size_gru_a), device=self.device()) * self._noise_gru
 
         # Conditioning :: ((B, T, F=gru_a), (B, T, F=cond)) -> (B, T=t_s, F=gru_a+cond)
         i_rnn_b = cat([o_rnn_a, cond_t_s_series], dim=-1)
@@ -171,7 +173,7 @@ class SampleNet(nn.Module):
             prev_h_b :: (B, F) - GRU_B's hidden state @t-1, None means h_b=0
             ndim_b             - Batch size
         Returns:
-            e_t      :: (B,)   - generated residual   @t,   mulaw_u8
+            e_t      :: (B,)   - generated residual   @t,   mulaw_u8pcm
             h_a      :: (B, F) - GRU_A's hidden state @t
             h_b      :: (B, F) - GRU_B's hidden state @t
         """
@@ -184,7 +186,7 @@ class SampleNet(nn.Module):
         h_b = self.gru_cell_b(cat([h_a,   cond_t], dim=-1), prev_h_b)
         e_t_pd = tree_to_pdf(self.dual_fc(h_b))
 
-        # Sampling :: (B, JDist) -> (B,)
+        # Sampling :: (B, JDist) -> (B,), mlaw_u8pcm
         dist_t = Categorical(e_t_pd)
         e_t = dist_t.sample() # pyright: ignore [reportUnknownMemberType]
 
