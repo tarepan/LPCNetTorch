@@ -37,6 +37,7 @@ model:
         ndim_cond_feat: 128
         frame_net:
             ndim_i_feat: 20
+            use_emb: True
             codebook_size: 256
             ndim_emb: 64
             kernel_size: 3

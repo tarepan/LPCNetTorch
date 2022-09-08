@@ -3,7 +3,7 @@
 from typing import List
 from dataclasses import dataclass
 
-from torch import Tensor, cat # pylint: disable=no-name-in-module
+from torch import Tensor, zeros, cat # pylint: disable=no-name-in-module
 import torch.nn as nn
 from omegaconf import MISSING
 
@@ -16,6 +16,7 @@ class ConfFrameNet:
     """Configuration of the FrameNet.
     Args:
         ndim_i_feat     - The size of input series's feature dimension
+        use_emb         - Whether to use pitch embedding
         codebook_size   - The size of Embedding codebook
         ndim_emb        - The size of pitch embedding series's feature/emb dimension
         ndim_h_o_feat   - The size of hidden/output series's feature dimension
@@ -24,6 +25,7 @@ class ConfFrameNet:
         num_segfc_layer - The number of segmental FC layers
     """
     ndim_i_feat: int = MISSING
+    use_emb: bool = MISSING
     codebook_size: int = MISSING
     ndim_emb: int = MISSING
     ndim_h_o_feat: int = MISSING
@@ -38,6 +40,8 @@ class FrameNet(nn.Module):
     """
     def __init__(self, conf: ConfFrameNet):
         super().__init__()
+        self._use_emb = conf.use_emb
+        self._ndim_emb = conf.ndim_emb
 
         # Validation - Compatibility between padding config and Conv 'valid' padding size
         valid_padding = calc_rf(conf.num_conv_layer, conf.kernel_size) - 1
@@ -87,8 +91,16 @@ class FrameNet(nn.Module):
                          :: (B, T=frm_cnk    , F) - Conditioning vector series
         """
 
-        # Pitch embedding :: (B, T) -> (B, T, Emb)
-        pitch_emb_series = self.emb(pitch_series)
+        if self._use_emb:
+            # Pitch embedding :: (B, T) -> (B, T, Emb)
+            pitch_emb_series = self.emb(pitch_series)
+        else:
+            # Zeros :: (B, T) -> (B, T, Emb)
+            pitch_emb_series = zeros(*pitch_series.size(), self._ndim_emb, device=self.device())
 
         # ConvSegFC :: ((B, T=frm_cnk+pad, F=feat), (B, T=frm_cnk+pad, Emb=emb)) -> (B, T=frm_cnk+pad, F=feat+emb) -> (Batch, T=frm_cnk, F)
         return self.conv_segfc(cat((feat_series, pitch_emb_series), dim=-1))
+
+    def device(self) -> str:
+        """Acquire current device."""
+        return str(self.emb.weight.device)
