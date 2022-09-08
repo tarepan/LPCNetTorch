@@ -5,15 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import torch
-from torch import nn, exp, permute, amax, amin
+from torch import nn, exp, permute
 from torch.distributions.categorical import Categorical
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 import pytorch_lightning as pl
 from omegaconf import MISSING
-import soundfile as sf
 
 from .domain import FPitchCoeffSt1nStcBatch
 from .data.domain import St1SeriesNoisyDatum

@@ -114,11 +114,11 @@ class Network(nn.Module):
         for i in range(len_t):
             coeff_t, cond_t = lpcoeff_series[:, i], cond_t_s_series[:, i]
 
-            # Linear Prediction :: ((B, T=order), (Order=order)) -> (B,)
+            # Linear Prediction :: ((B, T=order), (Order=order)) -> (B,), linear_s16
             p_t = linear_prediction(s_t_n, coeff_t)
 
             # Residual sampling :: -> ((B,), (B, F), (B, F))
-            e_t_mlaw, h_a, h_b = self.sample_net.generate(s_t_n[:, 0], p_t, e_t_1, cond_t, h_a, h_b, ndim_b)
+            e_t_mlaw, h_a, h_b = self.sample_net.generate(s_t_n[:, 0], p_t, e_t_1, cond_t, h_a, h_b, ndim_b) # mlaw_u8pcm
             e_t = mlaw2lin(e_t_mlaw) # mlaw_u8pcm -> linear_s16
 
             # Sample :: ((B,), (B,)) -> (B, 1), linear_s16pcm
