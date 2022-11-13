@@ -127,6 +127,7 @@ class Network(nn.Module):
             # Record :: ((B, T=t), (B, 1)) -> (B, T=t+1)
             s_t_series_estim = cat((s_t_series_estim, s_t_estim), dim=-1)
             # AR - Samples :: ((B, T=1), (B, T=order-1)) -> (B, T=order)
+            # todo: s_t_estim is ls16pcm, but should it be ls16cnt? (LP is continuous domain)
             s_t_n = cat([s_t_estim, s_t_n[:, :-1]], dim=-1)
             # AR - Residual, μlaw-scale
             e_t_1 = e_t
